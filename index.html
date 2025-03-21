@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>我的个人主页</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>欢迎来到我的主页！</h1>
+    </header>
+    <main>
+        <section>
+            <h2>关于我</h2>
+            <p>你好！我是杜瑞恒，这是我们狐朋狗友的第一个网页。</p>
+        </section>
+        <section>
+            <h2>我的照片墙</h2>
+            <div class="image-upload-container">
+                <div class="upload-form">
+                    <input type="file" id="image-input" accept="image/*" multiple>
+                    <button onclick="uploadImages()">上传图片</button>
+                </div>
+                <p id="upload-status"></p>
+                <div id="image-gallery" class="image-gallery">
+                    <!-- 图片将在这里显示 -->
+                </div>
+            </div>
+        </section>
+    </main>
+    <footer>
+        <p>© 2023杜瑞恒</p>
+    </footer>
+
+    <script>
+        // 初始化图片画廊
+        const gallery = document.getElementById('image-gallery');
+        
+        // 页面加载时获取已有图片
+        window.addEventListener('load', async () => {
+            try {
+                const response = await fetch('/images');
+                const images = await response.json();
+                images.forEach(image => {
+                    addImageToGallery(image.url);
+                });
+            } catch (error) {
+                console.error('加载图片失败:', error);
+            }
+        });
+
+        async function uploadImages() {
+            const input = document.getElementById('image-input');
+            const status = document.getElementById('upload-status');
+            
+            if (input.files && input.files.length > 0) {
+                const files = Array.from(input.files);
+                
+                // 检查是否所有文件都是图片
+                const allImages = files.every(file => file.type.startsWith('image/'));
+                if (!allImages) {
+                    status.textContent = '请只选择图片文件！';
+                    status.style.color = 'red';
+                    return;
+                }
+
+                status.textContent = '正在上传...';
+                status.style.color = 'blue';
+
+                try {
+                    for (const file of files) {
+                        const formData = new FormData();
+                        formData.append('image', file);
+
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            addImageToGallery(data.url);
+                        } else {
+                            const error = await response.json();
+                            throw new Error(error.error);
+                        }
+                    }
+
+                    status.textContent = '图片上传成功！';
+                    status.style.color = 'green';
+                } catch (error) {
+                    status.textContent = '上传失败: ' + error.message;
+                    status.style.color = 'red';
+                }
+
+                // 清空输入，允许重复上传
+                input.value = '';
+            } else {
+                status.textContent = '请先选择图片！';
+                status.style.color = 'red';
+            }
+        }
+
+        function addImageToGallery(imageUrl) {
+            // 创建图片容器
+            const imageContainer = document.createElement('div');
+            imageContainer.className = 'image-container';
+            
+            // 创建图片元素
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.className = 'gallery-image';
+            
+            // 创建删除按钮
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '删除';
+            deleteBtn.onclick = async function() {
+                try {
+                    // 从URL中提取文件名
+                    const filename = imageUrl.split('/').pop();
+                    const response = await fetch(`/uploads/${filename}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        imageContainer.remove();
+                    }
+                } catch (error) {
+                    console.error('删除失败:', error);
+                }
+            };
+            
+            // 组装并添加到画廊
+            imageContainer.appendChild(img);
+            imageContainer.appendChild(deleteBtn);
+            gallery.appendChild(imageContainer);
+        }
+
+        // 拖放功能
+        const dropZone = document.querySelector('.image-upload-container');
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                document.getElementById('image-input').files = e.dataTransfer.files;
+                uploadImages();
+            }
+        });
+    </script>
+</body>
+</html>
